@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    
+    <!-- level -->
+    <springProperty name="logLevel" source="log.level" />
+    
+    <!-- console -->
+    <springProperty name="logConsoleEnable" source="log.console.enable" />
+    
+    <!-- file -->
+    <springProperty name="logFileEnable" source="log.file.enable" />
+    <springProperty name="logFileDestination" source="log.file.destination" />
+    
+    <!-- rabbitmq -->
+    <springProperty name="logRabbitmqEnable" source="log.rabbitmq.enable" />
+    <springProperty name="logRabbitmqHost" source="log.rabbitmq.host" />
+    <springProperty name="logRabbitmqPort" source="log.rabbitmq.port" />
+    <springProperty name="logRabbitmqUsername" source="log.rabbitmq.username" />
+    <springProperty name="logRabbitmqPassword" source="log.rabbitmq.password" />
+    <springProperty name="logRabbitmqExchange" source="log.rabbitmq.exchange" />
+    <springProperty name="logRabbitmqRoutingKey" source="log.rabbitmq.routingKey" />
+    
+    <!-- app -->
+    <springProperty scope="context" name="appname" source="spring.application.name" />
+    
+    <include resource="org/springframework/boot/logging/logback/defaults.xml" />
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml" />
+    
+    <contextName>${appname}</contextName>
+    
+    <!-- 文件输出 -->
+    <if condition='property("logFileEnable").equalsIgnoreCase("true")'>
+	    <then>
+	       <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		        <!-- 输出格式 -->
+		        <encoder>
+		            <pattern>${FILE_LOG_PATTERN}</pattern>
+		        </encoder>
+		        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+		            <!--日志文件输出的文件名-->
+		            <FileNamePattern>${logFileDestination}/${appname}-%d{yyyy-MM-dd}.log</FileNamePattern> 
+		            <!--日志文件保留天数-->
+		            <MaxHistory>30</MaxHistory>
+		        </rollingPolicy>
+		        <!--日志文件最大的大小-->
+		        <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+		            <MaxFileSize>10MB</MaxFileSize>
+		        </triggeringPolicy>
+		    </appender>
+	    </then>
+    </if>
+    
+    <!-- RabbitMQ 输出 -->
+    <if condition='property("logRabbitmqEnable").equalsIgnoreCase("true")'>
+        <then>
+            <appender name="AMQP" class="com.wise.demo.log.AmqpLogbackAppender">
+		        <!-- layout is required but ignored as using the encoder for the AMQP message body -->
+		        <layout><pattern><![CDATA[ %level ]]></pattern></layout>
+		
+				<!-- 将 appname 作为自定义域加入日志，方便日志搜索 -->
+		        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+		            <customFields>{"appname": "${appname}"}</customFields>
+		        </encoder>
+		
+		        <host>${logRabbitmqHost}</host>
+		        <port>${logRabbitmqPort}</port>
+		        <username>${logRabbitmqUsername}</username>
+		        <password>${logRabbitmqPassword}</password>
+		        <exchangeName>${logRabbitmqExchange}</exchangeName>
+		        <routingKeyPattern>${logRabbitmqRoutingKey}</routingKeyPattern>
+		    
+		        <declareExchange>true</declareExchange>
+		        <exchangeType>topic</exchangeType>
+		        <generateId>true</generateId>
+		        <charset>UTF-8</charset>
+		        <durable>true</durable>
+		        <deliveryMode>PERSISTENT</deliveryMode>
+		     </appender>
+        </then>
+    </if>
+    
+    <!-- 根logger -->
+    <root level="INFO">
+        <!-- 控制台 -->
+        <if condition='property("logConsoleEnable").equalsIgnoreCase("true")'>
+            <then>
+                <appender-ref ref="CONSOLE" />
+            </then>
+        </if>
+        
+        <!-- file -->
+        <if condition='property("logFileEnable").equalsIgnoreCase("true")'>
+            <then>
+                <appender-ref ref="FILE" />
+            </then>
+        </if>
+        
+        <!-- rabbitmq -->
+        <if condition='property("logRabbitmqEnable").equalsIgnoreCase("true")'>
+            <then>
+                <appender-ref ref="AMQP" />
+            </then>
+        </if>
+    </root>
+    
+    <logger name="com.wise" level="${logLevel}" />
+    
+    <logger name="org.springframework" level="${logLevel}" />
+    <logger name="com.netflix" level="${logLevel}" />
+    
+</configuration>
